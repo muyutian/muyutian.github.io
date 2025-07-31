@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>测试页面</title>
+    <style>
+        #login,
+        #call,
+        #close,
+        #getLocation {
+            display: block;
+            width: 200px;
+            height: 40px;
+            margin: 0 auto;
+        }
+
+        #login {
+            margin-top: 20px;
+        }
+
+        #call,
+        #close,
+        #getLocation {
+            margin-top: 20px;
+        }
+
+        #container {
+            display: block;
+            margin: 0 auto;
+            width: 330px;
+            margin-top: 100px;
+        }
+
+        .span-text {
+            display: inline-block;
+            width: 100px;
+            height: 30px;
+        }
+
+        .input-text {
+            width: 212px;
+            height: 30px;
+        }
+
+        #inputContainer {
+            margin-top: 10px;
+        }
+
+        .im,
+        .rtc {
+            display: block;
+            margin: 0 auto;
+            width: 150px;
+            height: 30px;
+        }
+
+        .location {
+            display: block;
+            margin: 0 auto;
+            width: 100%;
+            height: 40px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container"></div>
+    <div class="im">
+        <span>im:</span>
+        <label>
+            T1
+            <input type="radio" name="im-option" value="T1" checked>
+        </label>
+        <label>
+            T2
+            <input type="radio" name="im-option" value="T2">
+        </label>
+    </div>
+    <div class="rtc">
+        <span>rtc:</span>
+        <label>
+            T1
+            <input type="radio" name="rtc-option" value="T1" checked>
+        </label>
+        <label>
+            T2
+            <input type="radio" name="rtc-option" value="T2">
+        </label>
+    </div>
+    <span class="location">暂未获取定位</span>
+
+    <button id="login" onclick="login()">登陆</button>
+    <button id="call" onclick="call()">呼叫</button>
+    <button id="getLocation" onclick="getLocation()">获取定位</button>
+    <script>
+        var InputData = undefined;
+        var IM = "T1";
+        var RTC = "T1";
+        var Callbacks = {};
+        var CallbackId = 0;
+        (function () {
+            var temp = localStorage.getItem("InputData");
+            if (temp == undefined) {
+                InputData = {
+                    uid: "test",
+                    uType: "1",
+                    server: "https://csapp.trcbank.com.cn:8011",
+                    linktype: "3",
+                    tellerid: "01072",
+                    touristType: "",
+                    accoutType: "",
+                    skill: "",
+                    queueRank: "",
+                    extData: JSON.stringify({
+                        "tellerImg": "https://csapp.trcbank.com.cn:8011/busiroom/test/teller.jpg"
+                    })
+                }
+            } else {
+                InputData = JSON.parse(temp);
+            }
+            onLoad();
+        })();
+
+        function onLoad() {
+            for (const key in InputData) {
+                var inputContainer = document.createElement("div");
+                inputContainer.id = "inputContainer";
+                var span = document.createElement("span");
+                span.className = "span-text";
+                span.innerText = key;
+                inputContainer.append(span);
+                var input = document.createElement("input");
+                input.className = "input-text";
+                if (key == "extData") {
+                    input = document.createElement("textarea");
+                    input.cols = 30;
+                    input.rows = 4;
+                }
+                input.id = key;
+                input.value = InputData[key];
+                inputContainer.append(input);
+                var container = document.getElementById("container");
+                container.append(inputContainer);
+            }
+            const radioButtons = document.querySelectorAll('input[type="radio"]');
+            radioButtons.forEach(radio => {
+                radio.addEventListener('change', () => {
+                    if (radio.name == "im-option") {
+                        IM = radio.value;
+                    } else if (radio.name == "rtc-option") {
+                        RTC = radio.value;
+                    }
+                });
+            });
+        }
+
+        function login() {
+            var obj = {
+                method: "login",
+                param: {
+                    uid: getValue("uid"),
+                    pwd: "111",
+                    uType: getValue("uType"),
+                    im: IM,
+                    rtc: RTC,
+                    server: getValue("server"),
+                    token: "",
+                }
+            }
+            jsToApp(obj, (param) => {
+                console.log(param);
+            });
+            saveData();
+        }
+        function call() {
+            var callParam = {
+                linktype: getValue("linktype"),
+                tellerid: getValue("tellerid"),
+                touristType: getValue("touristType"),
+                accoutType: getValue("accoutType"),
+                skill: getValue("skill"),
+                queueRank: getValue("queueRank")
+            }
+            var obj = {
+                method: "call",
+                param: {
+                    uid: getValue("uid"),
+                    uType: getValue("uType"),
+                    callType: "0",
+                    mediaType: "3",
+                    param: JSON.stringify(callParam),
+                    extData: getValue("extData"),
+                    businessType: ""
+                }
+            }
+            jsToApp(obj, (param) => {
+                console.log(param);
+            });
+            saveData();
+        }
+
+        function getLocation() {
+            var obj = {
+                method: "getLocation",
+                param: {}
+            }
+            jsToApp(obj, (param) => {
+                param = JSON.parse(param);
+                document.getElementsByClassName("location")[0].innerText = param.data.location;
+            });
+        }
+
+        function onAppToJsCallBack(id, param) {
+            if (id && Callbacks[id]) {
+                Callbacks[id](param);
+            }
+        }
+
+        function getValue(key) {
+            return document.getElementById(key).value;
+        }
+
+        function saveData() {
+            for (const key in InputData) {
+                InputData[key] = getValue(key);
+            }
+            localStorage.setItem("InputData", JSON.stringify(InputData));
+        }
+
+        function jsToApp(param, callback) {
+            if (callback != undefined) {
+                Callbacks[CallbackId] = callback;
+                param.callbackId = CallbackId;
+                CallbackId++;
+            }
+            param = JSON.stringify(param)
+            console.log('jsToApp:\n' + param);
+            if (checkIsIOS()) {
+                window.webkit.messageHandlers.jsToApp.postMessage(param);
+            }
+            if (checkIsAndroid()) {
+                window.android.jsToApp(param)
+            }
+        }
+        function checkIsIOS() {
+            var u = navigator.userAgent
+            var isIOS = !!u.match(/\(i[^;]+;( U;)? CPU.+Mac OS X/); //iOS
+            if (u.indexOf('iOS') > -1) {
+                isIOS = true;
+            }
+            return isIOS
+        }
+        function checkIsAndroid() {
+            var u = navigator.userAgent
+            var isAndroid = u.indexOf('Android') > -1 || u.indexOf('Linux') > -1; //Android
+            return isAndroid;
+        }
+    </script>
+</body>
+
+</html>
